@@ -1,0 +1,53 @@
+services:
+  # Zookeeper for Kafka
+  zookeeper:
+    image: wurstmeister/zookeeper:latest
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - '2181:2181'
+
+  # Kafka Broker
+  kafka:
+    image: wurstmeister/kafka:latest
+    depends_on:
+      - zookeeper
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: 'zookeeper:2181'  # Kafka connects to Zookeeper on internal network
+      KAFKA_LISTENERS: PLAINTEXT://kafka:9092  # Kafka listens on all interfaces inside the container
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092  # Kafka advertises internal service name for other services inside Docker
+      KAFKA_LISTENER_SECURITY_PROTOCOL: PLAINTEXT  # No encryption (use SSL for production)
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1  # Replication factor for internal topics (1 for single-broker setup)
+    ports:
+      - '9092:9092'  # Exposing Kafka port to host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  order-ms:
+    build: ./order-ms
+    volumes:
+      - ./order-ms/app:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - kafka
+
+  inventory-ms:
+    build: ./inventory-ms
+    volumes:
+      - ./inventory-ms/app:/app
+    ports:
+      - "8001:8001"
+    depends_on:
+      - kafka
+
+  payment-ms:
+    build: ./payment-ms
+    volumes:
+      - ./payment-ms/app:/app
+    ports:
+      - "8002:8002"
+    depends_on:
+      - kafka
